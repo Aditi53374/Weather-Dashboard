@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weather Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Weather Dashboard</h1>
+    <div class="search-section">
+      <input id="city-input" type="text" placeholder="Enter city name..." autocomplete="off">
+      <button id="search-btn">Search</button>
+    </div>
+    <div id="error-message" class="error-message"></div>
+    <div class="weather-section">
+      <div id="current-weather" class="current-weather"></div>
+      <div id="forecast" class="forecast"></div>
+    </div>
+    <div id="map" class="map"></div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html> 
