@@ -1,6 +1,7 @@
 // ========== CONFIGURATION ==========
 const OPENWEATHER_API_KEY = 'cca4636adada16b19237e357654a1661'; // <-- Replace with your API key
-const WEATHER_API_URL = 'https://api.openweathermap.org/data/2.5/onecall';
+const CURRENT_WEATHER_API_URL = 'https://api.openweathermap.org/data/2.5/weather';
+const FORECAST_API_URL = 'https://api.openweathermap.org/data/2.5/forecast';
 const GEO_API_URL = 'https://api.openweathermap.org/geo/1.0/direct';
 
 // ========== DOM ELEMENTS ==========
@@ -36,12 +37,22 @@ function initMap(lat = 40.7128, lon = -74.0060) { // Default: New York
 }
 
 // ========== FETCH WEATHER DATA ==========
-async function fetchWeather(lat, lon) {
-  const url = `${WEATHER_API_URL}?lat=${lat}&lon=${lon}&exclude=minutely,hourly,alerts&units=metric&appid=${OPENWEATHER_API_KEY}`;
+async function fetchCurrentWeather(lat, lon) {
+  const url = `${CURRENT_WEATHER_API_URL}?lat=${lat}&lon=${lon}&units=metric&appid=${OPENWEATHER_API_KEY}`;
   const res = await fetch(url);
   if (!res.ok) {
-    console.error('Weather API error:', res.status, url);
-    throw new Error('Weather data not found.');
+    console.error('Current Weather API error:', res.status, url);
+    throw new Error('Current weather data not found.');
+  }
+  return res.json();
+}
+
+async function fetchForecast(lat, lon) {
+  const url = `${FORECAST_API_URL}?lat=${lat}&lon=${lon}&units=metric&appid=${OPENWEATHER_API_KEY}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    console.error('Forecast API error:', res.status, url);
+    throw new Error('Forecast data not found.');
   }
   return res.json();
 }
@@ -67,32 +78,75 @@ async function fetchCityCoords(city) {
 
 // ========== RENDER FUNCTIONS ==========
 function renderCurrentWeather(data, cityName, country) {
-  const { temp, humidity, weather, wind_speed } = data.current;
-  const icon = weather[0].icon;
-  const desc = weather[0].description;
+  if (!data || !data.main || !data.weather || !data.weather[0]) {
+    throw new Error('Invalid weather data received');
+  }
+  
+  const { temp, humidity } = data.main;
+  const { icon, description } = data.weather[0];
+  const windSpeed = data.wind ? data.wind.speed : 'N/A';
+  
   currentWeatherDiv.innerHTML = `
     <h2>${cityName}, ${country}</h2>
-    <img src="https://openweathermap.org/img/wn/${icon}@4x.png" alt="${desc}" loading="lazy">
+    <img src="https://openweathermap.org/img/wn/${icon}@4x.png" alt="${description}" loading="lazy">
     <div class="temp">${Math.round(temp)}°C</div>
-    <div class="desc">${desc.charAt(0).toUpperCase() + desc.slice(1)}</div>
+    <div class="desc">${description.charAt(0).toUpperCase() + description.slice(1)}</div>
     <div class="details">
       <span>💧 ${humidity}%</span>
-      <span>💨 ${wind_speed} m/s</span>
+      <span>💨 ${windSpeed} m/s</span>
     </div>
   `;
 }
 
 function renderForecast(data) {
+  if (!data || !data.list || !Array.isArray(data.list)) {
+    throw new Error('Invalid forecast data received');
+  }
+  
   forecastDiv.innerHTML = '';
-  data.daily.slice(1, 8).forEach(day => {
-    const date = new Date(day.dt * 1000);
-    const icon = day.weather[0].icon;
-    const desc = day.weather[0].description;
+  // Group forecast data by day and get daily averages
+  const dailyData = {};
+  
+  data.list.forEach(item => {
+    if (!item || !item.main || !item.weather || !item.weather[0]) {
+      return; // Skip invalid items
+    }
+    
+    const date = new Date(item.dt * 1000);
+    const dayKey = date.toDateString();
+    
+    if (!dailyData[dayKey]) {
+      dailyData[dayKey] = {
+        date: date,
+        temps: [],
+        icons: [],
+        descriptions: []
+      };
+    }
+    
+    dailyData[dayKey].temps.push(item.main.temp);
+    dailyData[dayKey].icons.push(item.weather[0].icon);
+    dailyData[dayKey].descriptions.push(item.weather[0].description);
+  });
+  
+  // Get next 7 days (skip today)
+  const today = new Date().toDateString();
+  const next7Days = Object.values(dailyData)
+    .filter(day => day.date.toDateString() !== today)
+    .slice(0, 7);
+  
+  next7Days.forEach(day => {
+    if (day.temps.length === 0) return; // Skip days with no data
+    
+    const avgTemp = Math.round(day.temps.reduce((a, b) => a + b, 0) / day.temps.length);
+    const mostCommonIcon = day.icons[Math.floor(day.icons.length / 2)] || '01d'; // Use middle icon or default
+    const desc = day.descriptions[0] || 'Clear sky';
+    
     forecastDiv.innerHTML += `
       <div class="forecast-day">
-        <div>${date.toLocaleDateString(undefined, { weekday: 'short' })}</div>
-        <img src="https://openweathermap.org/img/wn/${icon}@2x.png" alt="${desc}" loading="lazy">
-        <div>${Math.round(day.temp.max)}° / ${Math.round(day.temp.min)}°C</div>
+        <div>${day.date.toLocaleDateString(undefined, { weekday: 'short' })}</div>
+        <img src="https://openweathermap.org/img/wn/${mostCommonIcon}@2x.png" alt="${desc}" loading="lazy">
+        <div>${avgTemp}°C</div>
         <div class="desc">${desc.charAt(0).toUpperCase() + desc.slice(1)}</div>
       </div>
     `;
@@ -120,9 +174,12 @@ async function handleSearch() {
   forecastDiv.innerHTML = '';
   try {
     const { lat, lon, name, country } = await fetchCityCoords(city);
-    const weatherData = await fetchWeather(lat, lon);
-    renderCurrentWeather(weatherData, name, country);
-    renderForecast(weatherData);
+    const [currentWeatherData, forecastData] = await Promise.all([
+      fetchCurrentWeather(lat, lon),
+      fetchForecast(lat, lon)
+    ]);
+    renderCurrentWeather(currentWeatherData, name, country);
+    renderForecast(forecastData);
     initMap(lat, lon);
   } catch (err) {
     showError(err.message);
