@@ -1,6 +1,6 @@
 # Weather Dashboard 🌦️
 
-A real-time, city-based Weather Dashboard with current weather data, 5-day forecast, interactive map, error handling, search debounce, responsive UI, and lazy-loading graphics.
+A real-time, city-based Weather Dashboard with current weather data, 7-day forecast, interactive map, error handling, search debounce, responsive UI, and lazy-loading graphics.
 
 ## ✨ Features
 - **🌍 City Search with Debounce**: Prevents excessive API calls while typing
